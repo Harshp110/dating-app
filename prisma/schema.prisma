@@ -1,0 +1,446 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+enum Gender {
+  WOMAN
+  MAN
+  NON_BINARY
+  SELF_DESCRIBED
+  PREFER_NOT_TO_SAY
+}
+enum EmploymentStatus {
+  STUDENT
+  EMPLOYED_SELF_EMPLOYED
+  LOOKING_FOR_WORK
+  NOT_WORKING
+  PREFER_NOT_TO_SAY
+}
+enum Intent {
+  EXPLORING
+  DATING
+  SERIOUS_RELATIONSHIP
+  LONG_TERM_MARRIAGE
+}
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+}
+enum Visibility {
+  PUBLIC
+  PRIVATE
+}
+enum PhotoStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+enum EnergyStyle {
+  INTROVERT
+  EXTROVERT
+  IN_BETWEEN
+}
+enum RhythmStyle {
+  EARLY_BIRD
+  NIGHT_OWL
+}
+enum PlanningStyle {
+  PLANNED
+  SPONTANEOUS
+}
+enum DiscoveryStatus {
+  OFFERED
+  VIEWED
+  EXPIRED
+}
+enum InterestActionType {
+  INTEREST
+  PASS
+}
+enum ConnectionState {
+  INTERESTED
+  CONNECTED
+  GETTING_TO_KNOW
+  OPEN_TO_MEETING
+  MET
+  CONTINUE
+  PAUSE
+  CLOSED
+}
+enum QuestionCategory {
+  WEEKEND
+  LIFESTYLE
+  VALUES
+  INTERESTS
+  COMMUNICATION
+}
+enum RevealState {
+  HIDDEN
+  REVEALED
+}
+enum MessageStatus {
+  SENT
+  READ
+}
+enum ReportCategory {
+  HARASSMENT
+  SPAM
+  FAKE_PROFILE
+  SAFETY_CONCERN
+  OTHER
+}
+enum ReportStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+}
+enum ActivityType {
+  COFFEE
+  WALK
+  BOOKSTORE
+  CAMPUS_EVENT
+  FOOD
+  ARCADE
+  MUSEUM
+  PARK
+  LOCAL_EVENT
+}
+enum DatePlanStatus {
+  PROPOSED
+  ACCEPTED
+  ALTERNATIVE_SUGGESTED
+  DECLINED
+  CANCELLED
+  MET
+  DID_NOT_MEET
+}
+enum MeetingOutcome {
+  MET
+  DID_NOT_MEET
+  CONTINUE
+  PAUSE
+  END_CONNECTION
+}
+
+model User {
+  id           String        @id @default(cuid())
+  authUserId   String        @unique
+  email        String        @unique
+  role         UserRole      @default(USER)
+  status       AccountStatus @default(ACTIVE)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  profile      Profile?
+  verification Verification?
+  sentActions  InterestAction[] @relation("ActionSender")
+  receivedActions InterestAction[] @relation("ActionRecipient")
+  discoveries  Discovery[] @relation("DiscoveryViewer")
+  discoveredIn Discovery[] @relation("DiscoveryCandidate")
+  connectionsA Connection[] @relation("ConnectionA")
+  connectionsB Connection[] @relation("ConnectionB")
+  questionAnswers QuestionAnswer[]
+  authoredQuestions MicroQuestion[]
+  blocksGiven Block[] @relation("Blocker")
+  blocksReceived Block[] @relation("Blocked")
+  reportsMade Report[] @relation("Reporter")
+  reportsReceived Report[] @relation("Reported")
+  messages Message[]
+  datePlans DatePlan[]
+  meetingFeedback MeetingFeedback[]
+
+  @@index([status])
+}
+
+model Profile {
+  id                  String           @id @default(cuid())
+  userId              String           @unique
+  firstName           String
+  dateOfBirth         DateTime
+  gender              Gender
+  city                String
+  bio                 String?          @db.VarChar(500)
+  energyStyle         EnergyStyle?
+  rhythmStyle         RhythmStyle?
+  planningStyle       PlanningStyle?
+  onboardingCompleted Boolean          @default(false)
+  visibility          Visibility       @default(PUBLIC)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  user                User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  education           EngineeringEducation?
+  employment          Employment?
+  preference          Preference?
+  photos              Photo[]
+  interests           ProfileInterest[]
+
+  @@index([city, visibility])
+  @@index([onboardingCompleted])
+}
+
+model EngineeringEducation {
+  id             String   @id @default(cuid())
+  profileId      String   @unique
+  degree         String
+  branch         String
+  college        String
+  graduationYear Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  profile        Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
+
+model Employment {
+  id              String           @id @default(cuid())
+  profileId       String           @unique
+  status          EmploymentStatus
+  role            String?
+  industry        String?
+  company         String?
+  experienceYears Int?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  profile          Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
+
+model Interest {
+  id        String           @id @default(cuid())
+  slug      String           @unique
+  label     String           @unique
+  createdAt DateTime         @default(now())
+  profiles  ProfileInterest[]
+}
+
+model ProfileInterest {
+  profileId  String
+  interestId String
+  profile    Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  interest   Interest @relation(fields: [interestId], references: [id], onDelete: Cascade)
+
+  @@id([profileId, interestId])
+  @@index([interestId])
+}
+
+model Preference {
+  id                String   @id @default(cuid())
+  profileId         String   @unique
+  intent            Intent
+  communicationNote String?  @db.VarChar(240)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  profile           Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
+
+model Verification {
+  id        String             @id @default(cuid())
+  userId    String             @unique
+  status    VerificationStatus @default(UNVERIFIED)
+  type      String             @default("ENGINEERING_BACKGROUND")
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+model Photo {
+  id         String      @id @default(cuid())
+  profileId  String
+  storageKey String      @unique
+  sortOrder  Int         @default(0)
+  status     PhotoStatus @default(PENDING)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  profile    Profile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId, sortOrder])
+}
+
+model Discovery {
+  id            String          @id @default(cuid())
+  viewerId      String
+  candidateId   String
+  discoveryDate DateTime        @db.Date
+  position      Int
+  status        DiscoveryStatus @default(OFFERED)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  viewer        User            @relation("DiscoveryViewer", fields: [viewerId], references: [id], onDelete: Cascade)
+  candidate     User            @relation("DiscoveryCandidate", fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@unique([viewerId, candidateId, discoveryDate])
+  @@unique([viewerId, discoveryDate, position])
+  @@index([viewerId, discoveryDate, status])
+}
+
+model InterestAction {
+  id          String             @id @default(cuid())
+  senderId    String
+  recipientId String
+  type        InterestActionType
+  createdAt   DateTime           @default(now())
+  sender      User               @relation("ActionSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient   User               @relation("ActionRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, recipientId])
+  @@index([recipientId, type])
+}
+
+model Connection {
+  id         String         @id @default(cuid())
+  userAId    String
+  userBId    String
+  state      ConnectionState @default(CONNECTED)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  userA      User           @relation("ConnectionA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB      User           @relation("ConnectionB", fields: [userBId], references: [id], onDelete: Cascade)
+  answers    QuestionAnswer[]
+  conversation Conversation?
+  datePlans DatePlan[]
+  meetingFeedback MeetingFeedback[]
+
+  @@unique([userAId, userBId])
+  @@index([userAId, state])
+  @@index([userBId, state])
+}
+
+model MicroQuestion {
+  id          String           @id @default(cuid())
+  prompt      String           @db.VarChar(240)
+  category    QuestionCategory
+  authorId    String?
+  active      Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  author      User?            @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  answers     QuestionAnswer[]
+
+  @@index([category, active])
+}
+
+model QuestionAnswer {
+  id           String       @id @default(cuid())
+  questionId   String
+  authorId     String
+  connectionId String
+  answer       String       @db.VarChar(500)
+  revealState  RevealState  @default(HIDDEN)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  question     MicroQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  author       User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  connection   Connection   @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, authorId, connectionId])
+  @@index([connectionId, revealState])
+}
+
+model Conversation {
+  id           String    @id @default(cuid())
+  connectionId String    @unique
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  connection   Connection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  messages     Message[]
+}
+
+model Message {
+  id             String        @id @default(cuid())
+  conversationId String
+  senderId       String
+  body           String        @db.VarChar(2000)
+  status         MessageStatus @default(SENT)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([senderId, status])
+}
+
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+model Report {
+  id         String         @id @default(cuid())
+  reporterId String
+  reportedId String
+  category   ReportCategory
+  details    String?        @db.VarChar(1000)
+  status     ReportStatus   @default(OPEN)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  reporter   User           @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported   User           @relation("Reported", fields: [reportedId], references: [id], onDelete: Cascade)
+
+  @@index([reportedId, status])
+  @@index([reporterId, createdAt])
+}
+
+model DatePlan {
+  id           String        @id @default(cuid())
+  connectionId String
+  proposerId   String
+  activity     ActivityType
+  startsAt     DateTime
+  generalArea  String        @db.VarChar(120)
+  note         String?       @db.VarChar(500)
+  status       DatePlanStatus @default(PROPOSED)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  connection   Connection    @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  proposer     User          @relation(fields: [proposerId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId, status])
+  @@index([proposerId, startsAt])
+}
+
+model ActivityCategory {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  label     String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, label])
+}
+
+model MeetingFeedback {
+  id           String         @id @default(cuid())
+  connectionId String
+  userId       String
+  outcome      MeetingOutcome
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  connection   Connection     @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, userId])
+  @@index([connectionId, outcome])
+}
